@@ -1,0 +1,74 @@
+version: '3'
+services:
+  zookeeper-prod-2:
+    image: wurstmeister/zookeeper
+    container_name: zookeeper-prod-2
+    ports:
+      - "2181:2181"
+  broker-prod-2:
+    image: wurstmeister/kafka
+    container_name: broker-prod-2
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper-prod-2
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ADVERTISED_HOST_NAME: kafka1
+      KAFKA_ADVERTISED_PORT: 9092
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper-prod-2:2181'
+      KAFKA_LOG_DIRS: /kafka/logs
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CREATE_TOPICS: "zb-data:1:1,zb-events:1:1"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://broker-prod-2:29092
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_INTERNAL://broker-prod-2:29092
+    volumes:
+       - ./data/kafka-data1/sock:/var/run/docker.sock
+       - ./data/kafka-data1/data:/kafka
+  cadvisor-prod:
+    volumes:
+       - '/:/rootfs:ro'
+       - '/var/run:/var/run:ro'
+       - '/sys:/sys:ro'
+       - '/var/lib/docker/:/var/lib/docker:ro'
+       - '/dev/disk/:/dev/disk:ro'
+    ports:
+       - '8080:8080'
+    container_name: cadvisor-prod
+    privileged: true
+    devices:
+       - /dev/kmsg
+    image: 'gcr.io/cadvisor/cadvisor:v0.36.0'
+  node-prod-2:
+    image: node:18.7
+    container_name: node-prod-2
+    depends_on:
+      - broker-prod-2
+    environment:
+      DIRECCION: "broker-prod-2"
+      PUERTO: "29092"
+   #   NODE_ENV: production
+    volumes:
+   #    - ./:/home/node/app
+       - ./node/prod:/home/node/app
+    working_dir: /home/node/app
+    command: "npm start"
+  node-cons-2:
+    image: node:18.7
+    container_name: node-cons-2
+    depends_on:
+      - broker-prod-2
+    environment:
+      DIRECCION: "broker-prod-2"
+      PUERTO: "29092"
+      CLOUDID: "marseloaburto:dXMtY2VudHJhbDEuZ2NwLmNsb3VkLmVzLmlvOjQ0MyQxOWM2ZWZlMWExOGU0MzcwOWViZDk3NjBiODRkM2NmYyRkNWM0MmVhNGQyYmE0OTU5OTZjNjA3OTMxODdmYWJlNQ=="
+      USERNAME: "elastic"
+      PASSWORD: "ZUM9PIgWeAPykSGjr46rzu30"
+   #   NODE_ENV: production
+    volumes:
+   #    - ./:/home/node/app
+       - ./node/cons:/home/node/app
+    working_dir: /home/node/app
+    command: "npm start"
+    restart: always
